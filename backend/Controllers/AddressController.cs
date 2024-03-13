@@ -1,6 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using address_management.Data;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq.Dynamic.Core;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace address_management.Controllers
 {
@@ -17,12 +21,104 @@ namespace address_management.Controllers
             _logger = logger;
         }
 
-        // GET: /Address
+        /* // GET: /Address
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Address>>> Get()
+        public async Task<ActionResult<IEnumerable<Address>>> Get([FromQuery] string sortBy = "Id", [FromQuery] string sortDirection = "asc")
         {
-            return await _context.Addresses.ToListAsync();
+            var query = _context.Addresses.AsQueryable();
+
+            switch (sortBy.ToLower())
+            {
+                case "street":
+                    query = (sortDirection.ToLower() == "asc") ? query.OrderBy(a => a.Street) : query.OrderByDescending(a => a.Street);
+                    break;
+                case "city":
+                    query = (sortDirection.ToLower() == "asc") ? query.OrderBy(a => a.City) : query.OrderByDescending(a => a.City);
+                    break;
+                case "state":
+                    query = (sortDirection.ToLower() == "asc") ? query.OrderBy(a => a.State) : query.OrderByDescending(a => a.State);
+                    break;
+                case "postalcode":
+                    query = (sortDirection.ToLower() == "asc") ? query.OrderBy(a => a.PostalCode) : query.OrderByDescending(a => a.PostalCode);
+                    break;
+                case "country":
+                    query = (sortDirection.ToLower() == "asc") ? query.OrderBy(a => a.Country) : query.OrderByDescending(a => a.Country);
+                    break;
+                default:
+                    query = (sortDirection.ToLower() == "asc") ? query.OrderBy(a => a.Id) : query.OrderByDescending(a => a.Id);
+                    break;
+            }
+
+            return await query.ToListAsync();
+        } */
+
+
+        // GET: /Address/
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Address>>> Get(
+            [FromQuery] string sortBy = "Id",
+            [FromQuery] string sortDirection = "asc",
+            [FromQuery] string street = null,
+            [FromQuery] string city = null,
+            [FromQuery] string state = null,
+            [FromQuery] string postalCode = null,
+            [FromQuery] string country = null,
+            [FromQuery] string searchQuery = null)
+        {
+            sortDirection = sortDirection.Equals("asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
+
+            string ConvertToPascalCase(string s) =>
+                Char.ToUpperInvariant(s[0]) + s.Substring(1);
+
+            sortBy = ConvertToPascalCase(sortBy);
+
+            var propertyInfo = typeof(Address).GetProperty(sortBy);
+            if (propertyInfo == null)
+            {
+                return BadRequest($"Invalid sort parameter: '{sortBy}'. Valid parameters include 'Id', 'Street', 'City', 'State', 'PostalCode', 'Country'.");
+            }
+
+            var query = _context.Addresses.AsQueryable();
+
+            // General Search Filtering
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                query = query.Where(a => a.Street.Contains(searchQuery)
+                                            || a.City.Contains(searchQuery)
+                                            || a.State.Contains(searchQuery)
+                                            || a.PostalCode.Contains(searchQuery)
+                                            || a.Country.Contains(searchQuery));
+            }
+
+            // Filtering
+            if (!string.IsNullOrWhiteSpace(street))
+            {
+                query = query.Where(a => a.Street.Contains(street));
+            }
+            if (!string.IsNullOrWhiteSpace(city))
+            {
+                query = query.Where(a => a.City.Contains(city));
+            }
+            if (!string.IsNullOrWhiteSpace(state))
+            {
+                query = query.Where(a => a.State.Contains(state));
+            }
+            if (!string.IsNullOrWhiteSpace(postalCode))
+            {
+                query = query.Where(a => a.PostalCode.Contains(postalCode));
+            }
+            if (!string.IsNullOrWhiteSpace(country))
+            {
+                query = query.Where(a => a.Country.Contains(country));
+            }
+
+            // Sorting
+            query = query.OrderBy($"{sortBy} {sortDirection}");
+
+            return await query.ToListAsync();
         }
+
+
 
         // GET: /Address/{id}
         [HttpGet("{id}")]
